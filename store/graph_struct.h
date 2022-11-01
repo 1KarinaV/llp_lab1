@@ -33,36 +33,36 @@ typedef union {
 typedef struct {
     block_data b_data;
     char reserved [1020];
-};
+}block;
 
 typedef struct {
     block_data b_data;
     label_cell labels[LABELS_IN_BLOCK];
-};
+}label_block;
 
 typedef struct {
     block_data b_data;
     char reserved[12];
     attribute_cell attributes[ATTRIBUTES_IN_BLOCK];
-};
+}attribute_block;
 
 typedef struct {
     block_data b_data;
     char reserved [12];
     relation_cell relations[RELATIONS_IN_BLOCK];
-};
+}relation_block;
 
 typedef struct {
     block_data b_data;
     char data[1020];
-} ;
+}str_block;
 
 typedef struct {
-    block_data metadata;
+    block_data b_data;
     int32_t prev_block;
     char reserved[9];
     node_cell nodes[NODES_IN_BLOCK];
-} ;
+}node_block;
 
 typedef struct {
     block_data b_data;
