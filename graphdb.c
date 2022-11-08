@@ -62,3 +62,83 @@ void freeDBScheme(memDBScheme * Scheme) { // Удаляет из памяти с
     occupied_memory -= sizeof(memDBScheme);
     free(Scheme);
 }
+
+memNodeSchemeRecord * findNodeSchemeByTypeName(memDBScheme * Scheme, char * TypeName, int * n) {
+    memNodeSchemeRecord * result = Scheme->FirstSchemeNode;
+    *n = 0;
+    while (result != NULL)
+        if (strcmp(TypeName, result->TypeString) == 0)
+            return result;
+        else {
+            result = result->NextNodeScheme;
+            (*n)++;
+        }
+    *n = -1;
+    return NULL;
+}
+
+memNodeSchemeRecord * addNodeTypeToScheme(memDBScheme * Scheme, char * TypeName) { // Добавляет новый тип узла в схему
+    memNodeSchemeRecord * result;
+    if (Scheme->FirstSchemeNode == NULL || Scheme->LastSchemeNode == NULL) {
+        result = (memNodeSchemeRecord *) malloc(sizeof(memNodeSchemeRecord));
+        occupied_memory += sizeof(memNodeSchemeRecord);
+        Scheme->FirstSchemeNode = result;
+        Scheme->LastSchemeNode = result;
+    } else {
+        // Проверяем, может быть уже есть узел с таким именем?
+        int n; // порядковый идентификатор существующего узла
+        if (findNodeSchemeByTypeName(Scheme, TypeName, &n)) // если нашли
+            return NULL;
+        result = (memNodeSchemeRecord *) malloc(sizeof(memNodeSchemeRecord));
+        occupied_memory += sizeof(memNodeSchemeRecord);
+        Scheme->LastSchemeNode->NextNodeScheme = result;
+        Scheme->LastSchemeNode = result;
+    }
+    result->TypeString = (char *) malloc(1 + strlen(TypeName)*sizeof(char));
+    occupied_memory += 1 + strlen(TypeName)*sizeof(char);
+    strcpy(result->TypeString, TypeName);
+    result->RootOffset = 0;
+    result->FirstOffset = 0;
+    result->LastOffset = 0;
+    result->Buffer = (char *) malloc(BufferSize*sizeof(char)); // Буфер с данными текущего узла
+    occupied_memory += BufferSize*sizeof(char);
+    result->nBuffer = 0; // Число заполненных байт в буфере
+    result->added = 0;
+    result->PrevOffset = 0; // Смещение от начала файла предыдущего узла
+    result->ThisOffset = 0; // Смещение от начала файла текущего узла
+    result->DirectedToFirst = NULL;
+    result->DirectedToLast = NULL;
+    result->AttrsFirst = NULL;
+    result->AttrsLast = NULL;
+    result->NextNodeScheme = NULL;
+
+    return result;
+}
+
+void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeScheme) {
+    if (Scheme->FirstSchemeNode != NULL && Scheme->LastSchemeNode != NULL) {
+        if (Scheme->FirstSchemeNode == Scheme->LastSchemeNode) {
+            if (Scheme->FirstSchemeNode == NodeScheme) {
+                freeDBSchemeNode(NodeScheme);
+                Scheme->FirstSchemeNode = NULL;
+                Scheme->LastSchemeNode = NULL;
+            }
+        } else if (Scheme->FirstSchemeNode == NodeScheme) {
+            Scheme->FirstSchemeNode = NodeScheme->NextNodeScheme;
+            freeDBSchemeNode(NodeScheme);
+        } else {
+            memNodeSchemeRecord * prev = Scheme->FirstSchemeNode;
+            while (prev != NULL && prev->NextNodeScheme != NodeScheme)
+                prev = prev->NextNodeScheme;
+            if (prev != NULL) {
+                if (Scheme->LastSchemeNode == NodeScheme) {
+                    Scheme->LastSchemeNode = prev;
+                    prev->NextNodeScheme = NULL;
+                } else {
+                    prev->NextNodeScheme = NodeScheme->NextNodeScheme;
+                }
+                freeDBSchemeNode(NodeScheme);
+            }
+        }
+    }
+}

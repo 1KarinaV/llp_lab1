@@ -78,10 +78,18 @@ typedef struct memCondition { // Элемент условия
     memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
 } memCondition;
 
-memDBScheme *
+memDBScheme * createDBScheme();          // Создает новую схему базы данных
+void freeDBSchemeAttr(memAttrRecord * Attr);         // Удаляет из памяти описатель атрибута
+void freeDBSchemeNode(memNodeSchemeRecord * NodeScheme);       // Удаляет из памяти описатель типа узла
+void freeDBScheme(memDBScheme * Scheme);            // Удаляет из памяти схему базы данных
 
-createDBScheme(); // Создает новую схему базы данных
-void freeDBSchemeAttr(memAttrRecord * Attr); // Удаляет из памяти описатель атрибута
-void freeDBSchemeNode(memNodeSchemeRecord * NodeScheme); // Удаляет из памяти описатель типа узла
-void freeDBScheme(memDBScheme * Scheme); // Удаляет из памяти схему базы данных
+
+// Поиск описателя узла в схеме Scheme по имени TypeName, порядковый номер описателя попадает в *n,
+// возвращает найденный описатель или NULL, если не найден
+memNodeSchemeRecord * findNodeSchemeByTypeName(memDBScheme * Scheme, char * TypeName, int * n);
+
+memNodeSchemeRecord * addNodeTypeToScheme(memDBScheme * Scheme, char * TypeName); // Добавляет новый тип узла в схему
+
+void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeScheme);    // Удаляет описатель типа узла из схемы
+
 #endif //LLP_LAB1_GRAPH_STRUCT_H
