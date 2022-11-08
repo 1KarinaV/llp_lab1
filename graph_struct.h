@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+
 // Структуры, описывающие схему данных в памяти
 
 // Опережающие объявления
@@ -91,5 +92,24 @@ memNodeSchemeRecord * findNodeSchemeByTypeName(memDBScheme * Scheme, char * Type
 memNodeSchemeRecord * addNodeTypeToScheme(memDBScheme * Scheme, char * TypeName); // Добавляет новый тип узла в схему
 
 void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeScheme);    // Удаляет описатель типа узла из схемы
+
+
+// Поиск атрибута в описателе узла NodeScheme по имени Name, порzдковый номер атрибута попадает в *n,
+// Возвращает найденный описатель атрибута или NULL, если не найден
+memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, int * n);
+
+memAttrRecord * addAttrToNodeScheme(memNodeSchemeRecord * NodeScheme, char * Name, unsigned char Type);  // Добавляет к описателя узла атрибут с именем Name и типом Type
+
+void delAttrFromNodeScheme(memNodeSchemeRecord * NodeScheme, memAttrRecord * Deleting);  // Удаляет атрибут Deleting из определения типа узла NodeScheme
+
+// Создает базу данных с описателем Scheme в файле с именем FileName
+// Возвращает указатель на структуру данных, представл€ющую созданную базу
+memDB * createNewDBbyScheme(memDBScheme * Scheme, char * FileName);
+
+memDB * openDB(char * FileName);    // Открывает существующую базу с именем FileName
+
+void closeDB(memDB * DB);    // Закрывает открытую базу данных
+
+
 
 #endif //LLP_LAB1_GRAPH_STRUCT_H

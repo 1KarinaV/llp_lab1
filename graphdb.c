@@ -142,3 +142,79 @@ void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeSchem
         }
     }
 }
+
+
+memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, int * n) {
+    memAttrRecord * result = NodeScheme->AttrsFirst;
+    *n = 0;
+    while (result != NULL)
+        if (strcmp(Name, result->NameString) == 0)
+            return result;
+        else {
+            result = result->next;
+            (*n)++;
+        }
+    *n = -1;
+    return NULL;
+}
+
+memAttrRecord * addAttrToNodeScheme(memNodeSchemeRecord * NodeScheme, char * Name, unsigned char Type) {
+    memAttrRecord * result;
+    if (NodeScheme->AttrsFirst == NULL || NodeScheme->AttrsLast == NULL) {
+        result = (memAttrRecord *) malloc(sizeof(memAttrRecord));
+        occupied_memory += sizeof(memAttrRecord);
+        NodeScheme->AttrsFirst = result;
+        NodeScheme->AttrsLast = result;
+    } else {
+        // Проверяем, может быть уже есть атрибут с таким именем?
+        int n; // порядковый идентификатор существующего атрибута
+        if (findAttrByName(NodeScheme, Name, &n)) // если нашли
+            return NULL;
+        result = (memAttrRecord *) malloc(sizeof(memAttrRecord));
+        occupied_memory += sizeof(memAttrRecord);
+        NodeScheme->AttrsLast->next = result;
+        NodeScheme->AttrsLast = result;
+    }
+    result->NameString = (char *) malloc(1 + strlen(Name)*sizeof(char));
+    occupied_memory += 1 + strlen(Name)*sizeof(char);
+    strcpy(result->NameString, Name);
+    result->Type = Type;
+    result->next = NULL;
+
+    return result;
+}
+
+void delAttrFromNodeScheme(memNodeSchemeRecord * NodeScheme, memAttrRecord * Deleting) {
+    if (NodeScheme->AttrsFirst != NULL && NodeScheme->AttrsLast != NULL) {
+        occupied_memory -= 1 + strlen(Deleting->NameString);
+        free(Deleting->NameString);
+        if (NodeScheme->AttrsFirst == NodeScheme->AttrsLast) {
+            if (NodeScheme->AttrsFirst == Deleting) {
+                occupied_memory -= sizeof(memAttrRecord);
+                free(NodeScheme->AttrsFirst);
+                NodeScheme->AttrsFirst = NULL;
+                NodeScheme->AttrsLast = NULL;
+            }
+        } else if (NodeScheme->AttrsFirst == Deleting) {
+            memAttrRecord * deleted = NodeScheme->AttrsFirst;
+            NodeScheme->AttrsFirst = NodeScheme->AttrsFirst->next;
+            occupied_memory -= sizeof(memAttrRecord);
+            free(deleted);
+        } else {
+            memAttrRecord * prev = NodeScheme->AttrsFirst;
+            while (prev != NULL && prev->next != Deleting)
+                prev = prev->next;
+            if (prev != NULL) {
+                memAttrRecord * deleted = prev->next;
+                if (NodeScheme->AttrsLast == Deleting) {
+                    NodeScheme->AttrsLast = prev;
+                    prev->next = NULL;
+                } else {
+                    prev->next = prev->next->next;
+                }
+                occupied_memory -= sizeof(memAttrRecord);
+                free(deleted);
+            }
+        }
+    }
+}
