@@ -15,6 +15,36 @@
         int relink_table_delta = 20; // Приращение таблицы связей в случае, если свободное место кончислось
         int reserved_for_links_in_node = 8; // Максимально допустимое количество связей на узел
         int occupied_memory = 0;
+
+typedef struct { // Структура для перекодировки загруженных из файла Ѕƒ и уже невалидных указателей на реальные
+    memNodeSchemeRecord ** place; // Указатель на указатель, который должен получить новое значение
+    memNodeSchemeRecord * old_value; // загруженное значение
+    memNodeSchemeRecord * new_value; // новое значение
+} relink_item;
+
+void addRelinking(memNodeSchemeRecord ** place, memNodeSchemeRecord * old_value, memNodeSchemeRecord * new_value,
+                  relink_item ** relink_table, int * relink_table_size, int * relink_table_capacity) {
+    if (*relink_table_size == *relink_table_capacity) {
+        *relink_table_capacity += relink_table_delta;
+        *relink_table = (relink_item *) realloc(*relink_table, (*relink_table_capacity)*sizeof(relink_item));
+    }
+    (*relink_table)[*relink_table_size].place = place;
+    (*relink_table)[*relink_table_size].old_value = old_value;
+    (*relink_table)[*relink_table_size].new_value = new_value;
+    (*relink_table_size)++;
+}
+
+void make_relinkings(relink_item ** relink_table, int * relink_table_size, int * relink_table_capacity) {
+    int i;
+    for (i = 0; i < *relink_table_size; i++)
+        if ((*relink_table)[i].place != NULL) {
+            int j = 0;
+            while (j < *relink_table_size && (*relink_table)[j].place != NULL || (*relink_table)[j].old_value != (*relink_table)[i].old_value)
+                j++;
+            *(*relink_table)[i].place = (*relink_table)[j].new_value;
+        }
+}
+
 memDBScheme * createDBScheme() { // Создает новую схему базы данных
     memDBScheme * result = (memDBScheme *) malloc(sizeof(memDBScheme));
     occupied_memory += sizeof(memDBScheme);
@@ -143,6 +173,67 @@ void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeSchem
     }
 }
 
+memNodeDirectedTo * checkCanLinkTo(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme) {
+    memNodeDirectedTo * result = NodeScheme->DirectedToFirst;
+    while (result != NULL)
+        if (ToNodeScheme == result->NodeScheme)
+            return result;
+        else
+            result = result->next;
+    return NULL;
+}
+
+
+memNodeDirectedTo * addDirectedToNodeScheme(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme) {
+    memNodeDirectedTo * rec;
+    if (checkCanLinkTo(NodeScheme, ToNodeScheme))
+        return NULL;
+    rec = (memNodeDirectedTo *) malloc(sizeof(memNodeDirectedTo));
+    occupied_memory += sizeof(memNodeDirectedTo);
+    rec->NodeScheme = ToNodeScheme;
+    rec->next = NULL;
+    if (NodeScheme->DirectedToFirst == NULL || NodeScheme->DirectedToLast == NULL) {
+        NodeScheme->DirectedToFirst = rec;
+        NodeScheme->DirectedToLast = rec;
+    } else {
+        NodeScheme->DirectedToLast->next = rec;
+        NodeScheme->DirectedToLast = rec;
+    }
+    return rec;
+}
+
+void delDirectedToFromNodeType(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * Deleting) {
+    if (NodeScheme->DirectedToFirst != NULL && NodeScheme->DirectedToLast != NULL) {
+        if (NodeScheme->DirectedToFirst == NodeScheme->DirectedToLast) {
+            if (NodeScheme->DirectedToFirst->NodeScheme == Deleting) {
+                occupied_memory -= sizeof(memNodeDirectedTo);
+                free(NodeScheme->DirectedToFirst);
+                NodeScheme->DirectedToFirst = NULL;
+                NodeScheme->DirectedToLast = NULL;
+            }
+        } else if (NodeScheme->DirectedToFirst->NodeScheme == Deleting) {
+            memNodeDirectedTo * deleted = NodeScheme->DirectedToFirst;
+            NodeScheme->DirectedToFirst = NodeScheme->DirectedToFirst->next;
+            occupied_memory -= sizeof(memNodeDirectedTo);
+            free(deleted);
+        } else {
+            memNodeDirectedTo * prev = NodeScheme->DirectedToFirst;
+            while (prev != NULL && prev->next->NodeScheme != Deleting)
+                prev = prev->next;
+            if (prev != NULL) {
+                memNodeDirectedTo * deleted = prev->next;
+                if (NodeScheme->DirectedToLast->NodeScheme == Deleting) {
+                    NodeScheme->DirectedToLast = prev;
+                    prev->next = NULL;
+                } else {
+                    prev->next = prev->next->next;
+                }
+                occupied_memory -= sizeof(memNodeDirectedTo);
+                free(deleted);
+            }
+        }
+    }
+}
 
 memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, int * n) {
     memAttrRecord * result = NodeScheme->AttrsFirst;
@@ -157,6 +248,7 @@ memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, in
     *n = -1;
     return NULL;
 }
+
 
 memAttrRecord * addAttrToNodeScheme(memNodeSchemeRecord * NodeScheme, char * Name, unsigned char Type) {
     memAttrRecord * result;
@@ -216,5 +308,269 @@ void delAttrFromNodeScheme(memNodeSchemeRecord * NodeScheme, memAttrRecord * Del
                 free(deleted);
             }
         }
+    }
+}
+
+// Далее идут функции буферизованного ввода/вывода
+void db_fwrite(void * buf, int item_size, int n_items, memDB * DB) {
+    char * _buf = (char *) buf;
+    int n_free = BufferSize - DB->nWriteBuffer;
+    int n_bytes = item_size*n_items;
+    int i = DB->nWriteBuffer;
+    if (DB->iReadBuffer < DB->nReadBuffer) {
+        fseek(DB->FileDB, DB->iReadBuffer - DB->nReadBuffer, SEEK_CUR);
+        DB->iReadBuffer = 0;
+        DB->nReadBuffer = 0;
+    }
+    if (n_free > 0) {
+        int to_write = n_free < n_bytes ? n_free : n_bytes;
+        DB->nWriteBuffer += to_write;
+        n_bytes -= to_write;
+        for ( ; to_write > 0; to_write--, i++)
+            DB->WriteBuffer[i] = *_buf++;
+    }
+    if (DB->nWriteBuffer == BufferSize) {
+        fwrite(DB->WriteBuffer, 1, BufferSize, DB->FileDB);
+        fwrite(_buf, 1, n_bytes, DB->FileDB);
+        DB->nWriteBuffer = 0;
+    }
+}
+
+void db_fread(void * buf, int item_size, int n_items, memDB * DB) {
+    char * _buf = (char *) buf;
+    int n_have = DB->nReadBuffer - DB->iReadBuffer;
+    int n_bytes = item_size*n_items;
+    for ( ; n_bytes > 0 && n_have > 0; n_have--, n_bytes--)
+        *_buf++ = DB->ReadBuffer[DB->iReadBuffer++];
+    if (n_bytes > 0) {
+        fread(_buf, 1, n_bytes, DB->FileDB);
+        DB->iReadBuffer = 0;
+        DB->nReadBuffer = fread(DB->ReadBuffer, 1, BufferSize, DB->FileDB);
+    }
+}
+
+void db_fflush(memDB * DB) {
+    if (DB->iReadBuffer < DB->nReadBuffer) {
+        fseek(DB->FileDB, DB->iReadBuffer - DB->nReadBuffer, SEEK_CUR);
+        DB->iReadBuffer = 0;
+        DB->nReadBuffer = 0;
+    }
+    if (DB->nWriteBuffer > 0) {
+        fwrite(DB->WriteBuffer, 1, DB->nWriteBuffer, DB->FileDB);
+        fflush(DB->FileDB);
+        DB->nWriteBuffer = 0;
+    }
+}
+
+int db_feof(memDB * DB) {
+    db_fflush(DB);
+    return feof(DB->FileDB);
+}
+
+void db_fclose(memDB * DB) {
+    db_fflush(DB);
+    fclose(DB->FileDB);
+}
+
+long int db_ftell(memDB * DB) {
+    db_fflush(DB);
+    return ftell(DB->FileDB);
+}
+
+void db_fseek(memDB * DB, long int offset, int whence) {
+    db_fflush(DB);
+    fseek(DB->FileDB, offset, whence);
+}
+
+
+// Сохраняет в файл список с типами разрешенных для соединения узлов
+void storeDirectedList(memDB * DB, memNodeDirectedTo * List) {
+    while (List != NULL) {
+        // пишем все указатели на элементы NodeScheme напрямую -- при чтении все их скорректируем
+        db_fwrite(&List->NodeScheme, sizeof(List->NodeScheme), 1, DB);
+        List = List->next;
+    }
+    db_fwrite(&List, sizeof(List), 1, DB);
+}
+
+// Сохранет в файл список с атрибутами некоторого типа узла
+void storeAttrsList(memDB * DB, memAttrRecord * List) {
+    int NameStringLength;
+    while (List != NULL) {
+        NameStringLength = 1 + strlen(List->NameString);
+        db_fwrite(&NameStringLength, sizeof(NameStringLength), 1, DB);
+        db_fwrite(List->NameString, NameStringLength, 1, DB);
+        db_fwrite(&List->Type, sizeof(List->Type), 1, DB);
+        List = List->next;
+    }
+    NameStringLength = 0;
+    db_fwrite(&NameStringLength, sizeof(NameStringLength), 1, DB);
+}
+
+// Сохраняет в файл данных схему узла
+void storeNodeScheme(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    int TypeStringLength = 1 + strlen(NodeScheme->TypeString);
+    // пишем все указатели на элементы NodeScheme напрямую
+    db_fwrite(&NodeScheme, sizeof(NodeScheme), 1, DB);
+    db_fwrite(&TypeStringLength, sizeof(TypeStringLength), 1, DB);
+    db_fwrite(NodeScheme->TypeString, TypeStringLength, 1, DB);
+    storeDirectedList(DB, NodeScheme->DirectedToFirst);
+    storeAttrsList(DB, NodeScheme->AttrsFirst);
+}
+
+// Сохраняет в файл данных схему данных
+void storeScheme(memDB * DB, memDBScheme * Scheme) {
+    memNodeSchemeRecord * NodeScheme = Scheme->FirstSchemeNode;
+    while (NodeScheme != NULL) {
+        storeNodeScheme(DB, NodeScheme);
+        NodeScheme = NodeScheme->NextNodeScheme;
+    }
+    db_fwrite(&NodeScheme, sizeof(NodeScheme), 1, DB);
+    NodeScheme = Scheme->FirstSchemeNode;
+    while (NodeScheme != NULL) {
+        int EmptyOffset = 0;
+        NodeScheme->RootOffset = db_ftell(DB);
+        db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+        db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+        NodeScheme = NodeScheme->NextNodeScheme;
+    }
+}
+
+// Загружает из файла список с атрибутами
+void loadAttrsList(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    int NameStringLength;
+    char * NameString;
+    unsigned char Type;
+    do {
+        db_fread(&NameStringLength, sizeof(NameStringLength), 1, DB);
+        if (NameStringLength > 0) {
+            NameString = (char *) malloc(NameStringLength*sizeof(char));
+            occupied_memory += NameStringLength*sizeof(char);
+            db_fread(NameString, NameStringLength, 1, DB);
+            db_fread(&Type, sizeof(Type), 1, DB);
+            addAttrToNodeScheme(NodeScheme, NameString, Type);
+            occupied_memory -= NameStringLength;
+            free(NameString);
+        }
+    } while (NameStringLength != 0);
+}
+
+// Загружает из файла данных разрешенные типы узлов для соединения дугами
+void loadDirectedList(memDB * DB, memNodeSchemeRecord * NodeScheme, relink_item ** relink_table, int * relink_table_size, int * relink_table_capacity) {
+    memNodeSchemeRecord * loadedNodeScheme;
+    do {
+        db_fread(&loadedNodeScheme, sizeof(loadedNodeScheme), 1, DB);
+        if (loadedNodeScheme) {
+            memNodeDirectedTo * rec = addDirectedToNodeScheme(NodeScheme, loadedNodeScheme);
+            addRelinking(&rec->NodeScheme, loadedNodeScheme, NULL, relink_table, relink_table_size, relink_table_capacity);
+        }
+    } while (loadedNodeScheme != NULL);
+}
+
+// Загружает из файла данных схему узла
+memNodeSchemeRecord * loadNodeScheme(memDB * DB, relink_item ** relink_table, int * relink_table_size, int * relink_table_capacity) {
+    memNodeSchemeRecord * loadedNodeScheme;
+    memNodeSchemeRecord * NodeScheme;
+    char * TypeString;
+    int TypeStringLength;
+    db_fread(&loadedNodeScheme, sizeof(loadedNodeScheme), 1, DB);
+    if (loadedNodeScheme == NULL) return NULL;
+
+    db_fread(&TypeStringLength, sizeof(TypeStringLength), 1, DB);
+    TypeString = (char *) malloc(TypeStringLength*sizeof(char));
+    occupied_memory += TypeStringLength*sizeof(char);
+    db_fread(TypeString, TypeStringLength, 1, DB);
+    NodeScheme = addNodeTypeToScheme(DB->Scheme, TypeString);
+    occupied_memory -= TypeStringLength;
+    free(TypeString);
+    addRelinking(NULL, loadedNodeScheme, NodeScheme, relink_table, relink_table_size, relink_table_capacity);
+    loadDirectedList(DB, NodeScheme, relink_table, relink_table_size, relink_table_capacity);
+    loadAttrsList(DB, NodeScheme);
+    return NodeScheme;
+}
+
+// Дозагружает из файла данных схему данных
+void loadScheme(memDB * DB, memDBScheme * Scheme) {
+    memNodeSchemeRecord * NodeScheme;
+    relink_item * relink_table = (relink_item *) malloc(relink_table_delta*sizeof(relink_item));
+    occupied_memory += relink_table_delta*sizeof(relink_item);
+    int relink_table_capacity = relink_table_delta;
+    int relink_table_size = 0;
+    while (loadNodeScheme(DB, &relink_table, &relink_table_size, &relink_table_capacity));
+    make_relinkings(&relink_table, &relink_table_size, &relink_table_capacity);
+    occupied_memory -= relink_table_capacity*sizeof(relink_item);
+    free(relink_table);
+    NodeScheme = Scheme->FirstSchemeNode;
+    while (NodeScheme != NULL) {
+        NodeScheme->RootOffset = db_ftell(DB);
+        db_fread(&NodeScheme->FirstOffset, sizeof(NodeScheme->FirstOffset), 1, DB);
+        db_fread(&NodeScheme->LastOffset, sizeof(NodeScheme->LastOffset), 1, DB);
+        NodeScheme->ThisOffset = NodeScheme->FirstOffset;
+        NodeScheme = NodeScheme->NextNodeScheme;
+    }
+}
+
+// Создает базу данных с описателем Scheme в файле с именем FileName
+// Возвращает указатель на структуру данных, представляющую созданную базу
+memDB * createNewDBbyScheme(memDBScheme * Scheme, char * FileName) {
+    memDB * result = (memDB *) malloc(sizeof(memDB));
+    occupied_memory += sizeof(memDB);
+    result->FileDB = fopen(FileName, "w+b");
+    if (result->FileDB) {
+        long int SchemeLength;
+        result->Scheme = Scheme;
+        result->WriteBuffer = (char *) malloc(BufferSize);
+        occupied_memory += BufferSize;
+        result->nWriteBuffer = 0;
+        result->ReadBuffer = (char *) malloc(BufferSize);
+        occupied_memory += BufferSize;
+        result->nReadBuffer = 0;
+        result->iReadBuffer = 0;
+        db_fseek(result, sizeof(long int), SEEK_SET); // оставляем место для указания размера схемы
+        storeScheme(result, Scheme);
+        SchemeLength = db_ftell(result);
+        db_fseek(result, 0, SEEK_SET);
+        db_fwrite(&SchemeLength, sizeof(SchemeLength), 1, result); // записываем размер схемы
+        db_fflush(result);
+        return result;
+    } else {
+        occupied_memory -= sizeof(*result);
+        free(result);
+        return NULL;
+    }
+}
+
+// Закрывает открытую базу данных
+void closeDB(memDB * DB) {
+    freeDBScheme(DB->Scheme);
+    db_fclose(DB);
+    free(DB->WriteBuffer);
+    free(DB->ReadBuffer);
+    occupied_memory -= 2*BufferSize;
+    free(DB);
+    occupied_memory -= sizeof(*DB);
+}
+
+// Открывает существующую базу с именем FileName
+memDB * openDB(char * FileName) {
+    memDB * result = (memDB *) malloc(sizeof(memDB));
+    occupied_memory += sizeof(memDB);
+    result->FileDB = fopen(FileName, "r+b");
+    if (result->FileDB) {
+        result->Scheme = createDBScheme();
+        result->WriteBuffer = (char *) malloc(BufferSize);
+        occupied_memory += BufferSize;
+        result->nWriteBuffer = 0;
+        result->ReadBuffer = (char *) malloc(BufferSize);
+        occupied_memory += BufferSize;
+        result->nReadBuffer = 0;
+        result->iReadBuffer = 0;
+        db_fseek(result, sizeof(long int), SEEK_SET); // Пропускаем место указания размера схемы
+        loadScheme(result, result->Scheme);
+        return result;
+    } else {
+        occupied_memory -= sizeof(*result);
+        free(result);
+        return NULL;
     }
 }

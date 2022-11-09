@@ -94,6 +94,17 @@ memNodeSchemeRecord * addNodeTypeToScheme(memDBScheme * Scheme, char * TypeName)
 void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeScheme);    // Удаляет описатель типа узла из схемы
 
 
+// Проверяет, может ли из узла типа NodeScheme вести дуга в узел типа ToNodeScheme
+// при успехе возвращает ссылку на регистрационную запись, иначе NULL
+memNodeDirectedTo * checkCanLinkTo(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme);
+
+// Добавляет к описателю узла NodeScheme ссылку на тип узла ToNodeScheme, в который может идти дуга.
+// Возвращает NULL при повторном добавлении или ссылку на добавл€емый тип
+memNodeDirectedTo * addDirectedToNodeScheme(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme);
+
+void delDirectedToFromNodeType(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * Deleting);    // Удаляет возможность связей с узлами Deleting из определения типа узла NodeScheme
+
+
 // Поиск атрибута в описателе узла NodeScheme по имени Name, порzдковый номер атрибута попадает в *n,
 // Возвращает найденный описатель атрибута или NULL, если не найден
 memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, int * n);
@@ -109,6 +120,24 @@ memDB * createNewDBbyScheme(memDBScheme * Scheme, char * FileName);
 memDB * openDB(char * FileName);    // Открывает существующую базу с именем FileName
 
 void closeDB(memDB * DB);    // Закрывает открытую базу данных
+
+void rewindFirstNodes(memDB * DB, memNodeSchemeRecord * NodeScheme);  // Переместить внутренний указатель множества узлов на первый узел
+
+// Перемещает внутренний указатель множества узлов к следующему узлу и возвращает не ноль.
+// Если же текущий узел = последний, возвращает ноль
+int nextNode(memDB * DB, memNodeSchemeRecord * NodeScheme);
+
+int openNode(memDB * DB, memNodeSchemeRecord * NodeScheme);   // Открывает текущий узел, загружая его данные в буфер
+
+void createNode(memDB * DB, memNodeSchemeRecord * NodeScheme);   // Добавляет новый узел, заполняя его нулями
+
+void cancelNode(memDB * DB, memNodeSchemeRecord * NodeScheme);    // Отменяет результаты редактирования текущего узла
+
+int deleteNode(memDB * DB, memNodeSchemeRecord * NodeScheme);     // Удаляет текущий узел. Возвращает ненулевое значение при успехе
+
+int createString(memDB * DB, char * S);   // Создает в базе новую строку и возвращает ее смещение от начала файла
+
+char * getString(memDB * DB, int Offset);   // Загружает из базы новую строку по ее смещению. Строка создается в динамической памяти
 
 
 
