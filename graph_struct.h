@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+enum { recEmpty = 0, recString, recNodeData } tpRecords; // Типы записей в файле
+enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems; // Типы данных атрибутов
+
 // Структуры, описывающие схему данных в памяти
 
 // Опережающие объявления
@@ -79,6 +82,8 @@ typedef struct memCondition { // Элемент условия
     memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
 } memCondition;
 
+void initGraphsRuntime(char * configFileName);
+
 memDBScheme * createDBScheme();          // Создает новую схему базы данных
 void freeDBSchemeAttr(memAttrRecord * Attr);         // Удаляет из памяти описатель атрибута
 void freeDBSchemeNode(memNodeSchemeRecord * NodeScheme);       // Удаляет из памяти описатель типа узла
@@ -122,18 +127,6 @@ memDB * openDB(char * FileName);    // Открывает существующу
 void closeDB(memDB * DB);    // Закрывает открытую базу данных
 
 void rewindFirstNodes(memDB * DB, memNodeSchemeRecord * NodeScheme);  // Переместить внутренний указатель множества узлов на первый узел
-
-// Перемещает внутренний указатель множества узлов к следующему узлу и возвращает не ноль.
-// Если же текущий узел = последний, возвращает ноль
-int nextNode(memDB * DB, memNodeSchemeRecord * NodeScheme);
-
-int openNode(memDB * DB, memNodeSchemeRecord * NodeScheme);   // Открывает текущий узел, загружая его данные в буфер
-
-void createNode(memDB * DB, memNodeSchemeRecord * NodeScheme);   // Добавляет новый узел, заполняя его нулями
-
-void cancelNode(memDB * DB, memNodeSchemeRecord * NodeScheme);    // Отменяет результаты редактирования текущего узла
-
-int deleteNode(memDB * DB, memNodeSchemeRecord * NodeScheme);     // Удаляет текущий узел. Возвращает ненулевое значение при успехе
 
 int createString(memDB * DB, char * S);   // Создает в базе новую строку и возвращает ее смещение от начала файла
 

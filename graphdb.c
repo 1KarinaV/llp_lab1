@@ -16,6 +16,38 @@
         int reserved_for_links_in_node = 8; // Максимально допустимое количество связей на узел
         int occupied_memory = 0;
 
+void initGraphsRuntime(char * configFileName) {
+    FILE * F = fopen(configFileName, "rt");
+    if (F) {
+        char buf[512];
+        while (!feof(F)) {
+            if (fgets(buf, sizeof(buf), F) && strlen(buf) != 0 && strcmp(buf, "\n") != 0) {
+                char * str = buf;
+                char * name = str;
+                while (*str != 0 && *str != '=' && *str != ' ') str++;
+                if (*str == 0)
+                    printf("Config: unrecognized line : %s\n", name);
+                else {
+                    char * val = str+1;
+                    int ival;
+                    *str = 0;
+                    while (*val != 0 && (*val == '=' || *val == ' ')) val++;
+                    sscanf(val, "%i", &ival);
+                    if (strcmp(name, "BufferSize") == 0)
+                        BufferSize = ival;
+                    else if (strcmp(name, "relink_table_delta") == 0)
+                        relink_table_delta = ival;
+                    else if (strcmp(name, "reserved_for_links_in_node") == 0)
+                        reserved_for_links_in_node = ival;
+                    else
+                        printf("Config: unrecognized var : %s\n", name);
+                }
+            }
+        }
+        fclose(F);
+    }
+}
+
 typedef struct { // Структура для перекодировки загруженных из файла Ѕƒ и уже невалидных указателей на реальные
     memNodeSchemeRecord ** place; // Указатель на указатель, который должен получить новое значение
     memNodeSchemeRecord * old_value; // загруженное значение
@@ -43,6 +75,14 @@ void make_relinkings(relink_item ** relink_table, int * relink_table_size, int *
                 j++;
             *(*relink_table)[i].place = (*relink_table)[j].new_value;
         }
+}
+
+void write_buffer(char * Buffer, int * nBuffer, float What) {
+    char * what = (char *) &What;
+    int i;
+    Buffer += *nBuffer;
+    for (i = 0; i < sizeof(float); i++, Buffer++, (*nBuffer)++)
+        *Buffer = what[i];
 }
 
 memDBScheme * createDBScheme() { // Создает новую схему базы данных
@@ -573,4 +613,55 @@ memDB * openDB(char * FileName) {
         free(result);
         return NULL;
     }
+}
+
+// Cоздает в базе новую строку и возвращает ее смещение от начала файла
+int createString(memDB * DB, char * S) {
+    unsigned char Type = recString;
+    int L = strlen(S);
+    int n = sizeof(int) + sizeof(unsigned char) + 1 + L;
+    int result;
+    db_fseek(DB, 0, SEEK_END);
+    result = db_ftell(DB);
+    db_fwrite(&n, sizeof(n), 1, DB);
+    db_fwrite(&Type, sizeof(Type), 1, DB);
+    db_fwrite(S, L + 1, 1, DB);
+    db_fflush(DB);
+    return result;
+}
+// Загружает из базы новую строку по ее смещению. Cтрока создается в динамической памяти
+char * getString(memDB * DB, int Offset) {
+    unsigned char Type;
+    char * result;
+    int L;
+    int n;
+    db_fseek(DB, Offset, SEEK_SET);
+    db_fread(&n, sizeof(n), 1, DB);
+    db_fread(&Type, sizeof(Type), 1, DB);
+    if (Type != recString)
+        return NULL;
+    L = n - sizeof(int) - sizeof(unsigned char);
+    result = (char *) malloc(L);
+    occupied_memory += L;
+    db_fread(result, L, 1, DB);
+    return result;
+}
+
+// Устанавливает значение атрибута текущего узла
+void setNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName, float Value) {
+    int n;
+    if (NodeScheme->nBuffer > 0 && findAttrByName(NodeScheme, AttrName, &n)) {
+        n *= sizeof(float);
+        write_buffer(NodeScheme->Buffer, &n, Value);
+    }
+}
+
+// Загружает значение атрибута текущего узла
+float getNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName) {
+    int n;
+    if (NodeScheme->nBuffer > 0 && findAttrByName(NodeScheme, AttrName, &n)) {
+        float * buf = (float *) NodeScheme->Buffer;
+        return buf[n];
+    } else
+        return 0.0;
 }
