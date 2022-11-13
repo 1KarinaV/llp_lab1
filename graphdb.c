@@ -629,6 +629,7 @@ int createString(memDB * DB, char * S) {
     db_fflush(DB);
     return result;
 }
+
 // Загружает из базы новую строку по ее смещению. Cтрока создается в динамической памяти
 char * getString(memDB * DB, int Offset) {
     unsigned char Type;

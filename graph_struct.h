@@ -133,5 +133,4 @@ int createString(memDB * DB, char * S);   // Создает в базе нову
 char * getString(memDB * DB, int Offset);   // Загружает из базы новую строку по ее смещению. Строка создается в динамической памяти
 
 
-
 #endif //LLP_LAB1_GRAPH_STRUCT_H

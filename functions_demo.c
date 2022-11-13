@@ -38,6 +38,5 @@ int main () {
 
     DB = createNewDBbyScheme(Scheme, "graphs.mydb");
 
-
     closeDB(DB);
 }
