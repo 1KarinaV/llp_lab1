@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+
 #include "graph_struct.h"
 
 // Значения по умолчанию. Реальные значения загружаются из конфигурационного файла в функции initGraphsRuntime()
@@ -15,6 +16,11 @@
         int relink_table_delta = 20; // Приращение таблицы связей в случае, если свободное место кончислось
         int reserved_for_links_in_node = 8; // Максимально допустимое количество связей на узел
         int occupied_memory = 0;
+
+
+void register_free(int amount) {
+    occupied_memory -= amount;
+}
 
 void initGraphsRuntime(char * configFileName) {
     FILE * F = fopen(configFileName, "rt");

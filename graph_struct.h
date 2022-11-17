@@ -82,6 +82,7 @@ typedef struct memCondition { // Элемент условия
     memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
 } memCondition;
 
+void register_free(int amount);   // Считывает освобожденную в программе память
 void initGraphsRuntime(char * configFileName);
 
 memDBScheme * createDBScheme();          // Создает новую схему базы данных
@@ -141,6 +142,8 @@ void cancelNode(memDB * DB, memNodeSchemeRecord * NodeScheme);    // Отмен�
 int deleteNode(memDB * DB, memNodeSchemeRecord * NodeScheme);     // Удаляет текущий узел. Возвращает ненулевое значение при успехе
 
 void setNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName, float Value);  // Устанавливает значение атрибута текущего узла
+
+float getNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName); // Загружает значение атрибута текущего узла
 
 int createString(memDB * DB, char * S);   // Создает в базе новую строку и возвращает ее смещение от начала файла
 
