@@ -7,6 +7,8 @@
 #include "graph_struct.h"
 
 int main () {
+    char * Titles[5] = {"Mist", "Prometeus", "Flew over the cookoo's nest", "Shawshank redemption", "AfterNoon"};
+    char * Families[10] = {"Stepanov", "Hamatova", "Churikova", "Pitt", "Delon", "Williams", "Nickolson", "Boyarskaya", "Freeman", "De Vito"};
     memDBScheme *Scheme;
     memDB * DB;
     memNodeSchemeRecord * MovieNodeType;
@@ -37,6 +39,7 @@ int main () {
     delAttrFromNodeScheme(MovieNodeType, findAttrByName(MovieNodeType, "ToDelete", &i));
 
     DB = createNewDBbyScheme(Scheme, "graphs.mydb");
+
 
     closeDB(DB);
 }
