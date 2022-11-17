@@ -615,6 +615,27 @@ memDB * openDB(char * FileName) {
     }
 }
 
+void createNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    memAttrRecord * AList = NodeScheme->AttrsFirst;
+    int i;
+    cancelNode(DB, NodeScheme);
+    NodeScheme->nBuffer = 0;
+    NodeScheme->added = 1;
+    // В начале записи резервируем место под атрибуты, каждый занимет 4 байта (для строк сохраняется смещение
+    // созданной записи типа recString)
+    while (AList != NULL) {
+        write_buffer(NodeScheme->Buffer, &NodeScheme->nBuffer, 0.0);
+        AList = AList->next;
+    }
+    // Записываем число присоединенных узлов
+    write_buffer(NodeScheme->Buffer, &NodeScheme->nBuffer, 0.0);
+    // Резервируем место для будущих дуг
+    for (i = 0; i < reserved_for_links_in_node; i++) {
+        write_buffer(NodeScheme->Buffer, &NodeScheme->nBuffer, 0.0);
+        write_buffer(NodeScheme->Buffer, &NodeScheme->nBuffer, 0.0);
+    }
+}
+
 // Cоздает в базе новую строку и возвращает ее смещение от начала файла
 int createString(memDB * DB, char * S) {
     unsigned char Type = recString;
@@ -665,4 +686,69 @@ float getNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName)
         return buf[n];
     } else
         return 0.0;
+}
+int LinkCurrentNodeToCurrentNode(memDB * DB, memNodeSchemeRecord * NodeSchemeFrom, memNodeSchemeRecord * NodeSchemeTo) {
+    memAttrRecord * AList = NodeSchemeFrom->AttrsFirst;
+    memNodeDirectedTo * DList = NodeSchemeFrom->DirectedToFirst;
+    float * buf;
+    int n, i;
+    int offs = 0;
+    while (DList != NULL && DList->NodeScheme != NodeSchemeTo) {
+        DList = DList->next;
+    }
+    if (DList == NULL)
+        return 0;
+    while (AList != NULL) {
+        offs += sizeof(float);
+        AList = AList->next;
+    }
+    // число присоединенных узлов
+    buf = (float *) (NodeSchemeFrom->Buffer + offs);
+    n = *buf;
+    for (i = 0; i < n; i++)
+        if (buf[2*i+1] == NodeSchemeTo->RootOffset && buf[2*i+2] == NodeSchemeTo->ThisOffset)
+            return 1;
+    if (n < reserved_for_links_in_node) {
+        (*buf)++;
+        buf[2*n+1] = NodeSchemeTo->RootOffset;
+        buf[2*n+2] = NodeSchemeTo->ThisOffset;
+        return 1;
+    } else
+        return 0;
+}
+
+void postNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    if (NodeScheme->nBuffer > 0) {
+        // Считываем случаи единственного (первого+последнего) и последнего узла
+        if (NodeScheme->added) {
+            int n = sizeof(int) + sizeof(unsigned char) + sizeof(int) + NodeScheme->nBuffer;
+            unsigned char Type = recNodeData;
+            int EmptyOffset = 0;
+            db_fseek(DB, 0, SEEK_END);
+            NodeScheme->ThisOffset = db_ftell(DB);
+            db_fwrite(&n, sizeof(n), 1, DB);
+            db_fwrite(&Type, sizeof(Type), 1, DB);
+            db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+            db_fwrite(NodeScheme->Buffer, NodeScheme->nBuffer, 1, DB);
+            NodeScheme->PrevOffset = NodeScheme->LastOffset;
+            if (NodeScheme->FirstOffset == 0 && NodeScheme->LastOffset == 0) { // ¬ базе пока нет узлов
+                db_fseek(DB, NodeScheme->RootOffset, SEEK_SET);
+                db_fwrite(&NodeScheme->ThisOffset, sizeof(int), 1, DB);
+                db_fwrite(&NodeScheme->ThisOffset, sizeof(int), 1, DB);
+                NodeScheme->FirstOffset = NodeScheme->ThisOffset;
+                NodeScheme->LastOffset = NodeScheme->ThisOffset;
+            } else {
+                db_fseek(DB, NodeScheme->PrevOffset + sizeof(int) + sizeof(unsigned char), SEEK_SET);
+                db_fwrite(&NodeScheme->ThisOffset, sizeof(int), 1, DB);
+                db_fseek(DB, NodeScheme->RootOffset + sizeof(int), SEEK_SET);
+                db_fwrite(&NodeScheme->ThisOffset, sizeof(int), 1, DB);
+                NodeScheme->LastOffset = NodeScheme->ThisOffset;
+            }
+            NodeScheme->added = 0;
+        } else {
+            db_fseek(DB, NodeScheme->ThisOffset + sizeof(int) + sizeof(unsigned char) + sizeof(int), SEEK_SET);
+            db_fwrite(NodeScheme->Buffer, NodeScheme->nBuffer, 1, DB);
+        }
+        db_fflush(DB);
+    }
 }
