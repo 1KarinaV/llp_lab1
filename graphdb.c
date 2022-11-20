@@ -642,6 +642,48 @@ void createNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
     }
 }
 
+int openNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    unsigned char Type;
+    int Dummy;
+    int n;
+    cancelNode(DB, NodeScheme);
+    if (NodeScheme->ThisOffset == 0)
+        return 0;
+    NodeScheme->nBuffer = 0;
+    NodeScheme->added = 0;
+    db_fseek(DB, NodeScheme->ThisOffset, SEEK_SET);
+    db_fread(&n, sizeof(n), 1, DB);
+    db_fread(&Type, sizeof(Type), 1, DB);
+    if (Type != recNodeData)
+        return 0;
+    db_fread(&Dummy, sizeof(int), 1, DB);
+    NodeScheme->nBuffer = n - sizeof(n) - sizeof(Type) - sizeof(int);
+    db_fread(NodeScheme->Buffer, NodeScheme->nBuffer, 1, DB);
+    return 1;
+}
+
+void cancelNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    NodeScheme->nBuffer = 0;
+    NodeScheme->added = 0;
+}
+
+int nextNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    cancelNode(DB, NodeScheme);
+    if (NodeScheme->FirstOffset == 0 || NodeScheme->LastOffset == 0 ||
+        NodeScheme->ThisOffset == 0)
+        return 0;
+    db_fseek(DB, NodeScheme->ThisOffset + sizeof(int) + sizeof(unsigned char), SEEK_SET);
+    NodeScheme->PrevOffset = NodeScheme->ThisOffset;
+    db_fread(&NodeScheme->ThisOffset, sizeof(int), 1, DB);
+    return 1;
+}
+
+void rewindFirstNodes(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    cancelNode(DB, NodeScheme);
+    NodeScheme->ThisOffset = NodeScheme->FirstOffset;
+    NodeScheme->PrevOffset = 0;
+}
+
 // Cоздает в базе новую строку и возвращает ее смещение от начала файла
 int createString(memDB * DB, char * S) {
     unsigned char Type = recString;

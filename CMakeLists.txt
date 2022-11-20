@@ -3,4 +3,4 @@ project(llp_lab1 C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(llp_lab1  graphdb.c graph_struct.h)
+add_executable(llp_lab1 functons_demo.c graphdb.c graph_struct.h)
