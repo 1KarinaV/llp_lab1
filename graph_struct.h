@@ -8,6 +8,9 @@
 enum { recEmpty = 0, recString, recNodeData } tpRecords; // Типы записей в файле
 enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems; // Типы данных атрибутов
 
+enum { oprndIntBoolFloat = 0, oprndString, oprndAttrName, oprndCondition }; // типы операндов в условиях
+enum { opEqual = 0, opNotEqual, opLess, opGreater, opNot, opAnd, opOr }; // типы операций
+
 // Структуры, описывающие схему данных в памяти
 
 // Опережающие объявления
@@ -149,11 +152,63 @@ int createString(memDB * DB, char * S);   // Создает в базе нову
 
 char * getString(memDB * DB, int Offset);   // Загружает из базы новую строку по ее смещению. Строка создается в динамической памяти
 
+
+// Возвращает список из *n пар вида (RootOffset; NodeOffset), представляющих узлы,
+// в которые идут дуги из текущего узла
+float * getDirectedToList(memDB * DB, memNodeSchemeRecord * NodeScheme, int * n);
+
+void setNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName, float Value);  // Устанавливает значение атрибута текущего узла
+
+float getNodeAttr(memDB * DB, memNodeSchemeRecord * NodeScheme, char * AttrName); // Загружает значение атрибута текущего узла
+
+
 // Направляет дугу из текущего узла множества NodeSchemeFrom к текущему узлу множества NodeSchemeTo
 // Узел From должен быть открыт для редактирования
 // Возвращает ненулевое значение при успехе
 int LinkCurrentNodeToCurrentNode(memDB * DB, memNodeSchemeRecord * NodeSchemeFrom, memNodeSchemeRecord * NodeSchemeTo);
 
 
-void postNode(memDB * DB, memNodeSchemeRecord * NodeScheme);  // Сохраняет новый или отредактированный узел (из теущего буфера) в базе
+void postNode(memDB * DB, memNodeSchemeRecord * NodeScheme);  // Сохраняет новый или отредактированный узел (из текущего буфера) в базе
+
+// Создает логическое унарное или бинарное условие вида (operand1 [operation] operand2) или ([operation] operand1)
+memCondition * createLogicCondition(unsigned char operation, memCondition * operand1, memCondition * operand2);
+// Условия-отношения на атрибуты
+memCondition * createStringAttrCondition(unsigned char operation, char * AttrName, char * Val);
+
+memCondition * createIntOrBoolAttrCondition(unsigned char operation, char * AttrName, int Val);
+
+memCondition * createFloatAttrCondition(unsigned char operation, char * AttrName, float Val);
+
+void freeOperand(memConditionOperand * op);    // Удаляет из памяти операнд условия
+
+void freeCondition(memCondition * Cond);      // Удаляет из памяти условие
+
+int testNodeCondition(memDB * DB, memNodeSchemeRecord * NodeScheme, memCondition * Condition);  // Тестирует открытый текущий узел типа NodeScheme на условие Condition
+
+memNodeSetItem * queryAllNodesOfType(memDB * DB, memNodeSchemeRecord * NodeScheme, memCondition * Condition);   //Выбирает все узлы типа NodeScheme, подпадающие под условие Condition
+
+memNodeSetItem * queryNodeSet(memDB * DB, memNodeSetItem * NodeSet, memCondition * Condition);  // Выбирает все узлы из результатов запроса NodeSet, подпадающие под условие Condition
+
+// Выбирает все узлы, соответствующие запросу в Cypher-стиле длиной nLinks элементов
+// Каждый элемент запроса включает ссылку на тип узла и наложенное на него условие
+memNodeSetItem * queryCypherStyle(memDB * DB, int nLinks, ...);
+
+// Удаляет все конечные узлы, соответствующие запросу в Cypher-стиле длиной nLinks элементов
+//Каждый элемент запрса включает ссылку на тип узла и наложенное на него условие
+// Перемещает внутренний указатель множества узлов типа NodeSet->NodeScheme к узлу,
+// специфицированному элементом NodeSet.
+void navigateByNodeSetItem(memDB * DB, memNodeSetItem * NodeSet);
+void deleteCypherStyle(memDB * DB, int nLinks, ...);
+
+// Модифицирует все конечные узлы, соответствующие запросу в Cypher-стиле длиной nLinks элементов
+// Каждый элемент запроса включает ссылку на тип узла и наложенное на него условие
+// AttrName = имя атрибута
+// AttrVal = числовое/логическое значение или смещение записи-строки в базу (возвращается ф-цией createString)
+void setCypherStyle(memDB * DB, char * AttrName, float AttrVal, int nLinks, ...);
+
+
+//Освобождает результаты запроса NodeSet
+void freeNodeSet(memDB * DB, memNodeSetItem * NodeSet);
+
+
 #endif //LLP_LAB1_GRAPH_STRUCT_H

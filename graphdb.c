@@ -800,3 +800,352 @@ void postNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
         db_fflush(DB);
     }
 }
+
+int testNodeCondition(memDB * DB, memNodeSchemeRecord * NodeScheme, memCondition * Condition) {
+/*
+  enum { oprndIntBoolFloat = 0, oprndString, oprndAttrName, oprndCondition } memOperandsType; // “ипы операндов в услови€х
+  enum { opEqual = 0, opNotEqual, opLess, opGreater, opNot, opAnd, opOr } memOperationsType; // “ипы операций
+*/
+    memConditionOperand Left;
+    memConditionOperand Right;
+    int result;
+    if (NodeScheme->nBuffer == 0)
+        return 0;
+    if (Condition == NULL)
+        return 1;
+
+    Left = *Condition->Operand1;
+    if (Condition->Operand1->OperandType == oprndAttrName) {
+        int i;
+        memAttrRecord * desc = findAttrByName(NodeScheme, Condition->Operand1->opAttrName, &i);
+        float val = getNodeAttr(DB, NodeScheme, Condition->Operand1->opAttrName);
+        switch (desc->Type) {
+            case tpString:
+                Left.OperandType = oprndString;
+                Left.opString = getString(DB, val);
+                break;
+            default:
+                Left.OperandType = oprndIntBoolFloat;
+                Left.opInt_Bool_Float = val;
+                break;
+        }
+    }
+    Right = *Condition->Operand2;
+    if (Condition->Operand2->OperandType == oprndAttrName) {
+        int i;
+        memAttrRecord * desc = findAttrByName(NodeScheme, Condition->Operand2->opAttrName, &i);
+        float val = getNodeAttr(DB, NodeScheme, Condition->Operand2->opAttrName);
+        switch (desc->Type) {
+            case tpString:
+                Right.OperandType = oprndString;
+                Right.opString = getString(DB, val);
+                break;
+            default:
+                Right.OperandType = oprndIntBoolFloat;
+                Right.opInt_Bool_Float = val;
+                break;
+        }
+    }
+
+    switch (Condition->OperationType) {
+        case opEqual: {
+            if (Left.OperandType == Right.OperandType) {
+                if (Left.OperandType == oprndString)
+                    result = strcmp(Left.opString, Right.opString) == 0;
+                else
+                    result = Left.opInt_Bool_Float == Right.opInt_Bool_Float;
+            } else
+                result = 0;
+            break;
+        }
+        case opNotEqual: {
+            if (Left.OperandType == Right.OperandType) {
+                if (Left.OperandType == oprndString)
+                    result = strcmp(Left.opString, Right.opString) != 0;
+                else
+                    result = Left.opInt_Bool_Float != Right.opInt_Bool_Float;
+            } else
+                result = 0;
+            break;
+        }
+        case opLess: {
+            if (Left.OperandType == Right.OperandType) {
+                if (Left.OperandType == oprndString)
+                    result = strcmp(Left.opString, Right.opString) < 0;
+                else
+                    result = Left.opInt_Bool_Float < Right.opInt_Bool_Float;
+            } else
+                result = 0;
+            break;
+        }
+        case opGreater: {
+            if (Left.OperandType == Right.OperandType) {
+                if (Left.OperandType == oprndString)
+                    result = strcmp(Left.opString, Right.opString) > 0;
+                else
+                    result = Left.opInt_Bool_Float > Right.opInt_Bool_Float;
+            } else
+                result = 0;
+            break;
+        }
+        case opNot: {
+            result = !testNodeCondition(DB, NodeScheme, Left.opCondition);
+            break;
+        }
+        case opAnd: {
+            result = testNodeCondition(DB, NodeScheme, Left.opCondition) &&
+                     testNodeCondition(DB, NodeScheme, Right.opCondition);
+            break;
+        }
+        case opOr: {
+            result = testNodeCondition(DB, NodeScheme, Left.opCondition) ||
+                     testNodeCondition(DB, NodeScheme, Right.opCondition);
+            break;
+        }
+    }
+
+    if (Condition->Operand1->OperandType == oprndAttrName && Left.OperandType == oprndString) {
+        occupied_memory -= 1 + strlen(Left.opString);
+        free(Left.opString);
+    }
+    if (Condition->Operand2->OperandType == oprndAttrName && Right.OperandType == oprndString) {
+        occupied_memory -= 1 + strlen(Right.opString);
+        free(Right.opString);
+    }
+    return result;
+}
+
+memNodeSetItem * queryAllNodesOfType(memDB * DB, memNodeSchemeRecord * NodeScheme, memCondition * Condition) {
+    memNodeSetItem * result = NULL;
+    memNodeSetItem * prev = NULL;
+    rewindFirstNodes(DB, NodeScheme);
+    while (openNode(DB, NodeScheme)) {
+        if (testNodeCondition(DB, NodeScheme, Condition)) {
+            memNodeSetItem * item = (memNodeSetItem *) malloc(sizeof(memNodeSetItem));
+            occupied_memory += sizeof(memNodeSetItem);
+            item->NodeScheme = NodeScheme;
+            item->PrevOffset = NodeScheme->PrevOffset;
+            item->ThisOffset = NodeScheme->ThisOffset;
+            item->next = NULL;
+            item->prev = prev;
+            if (prev != NULL) prev->next = item;
+            prev = item;
+            if (result == NULL) result = item;
+        }
+        nextNode(DB, NodeScheme);
+    }
+    return result;
+}
+
+
+void navigateByNodeSetItem(memDB * DB, memNodeSetItem * NodeSet) {
+    NodeSet->NodeScheme->PrevOffset = NodeSet->PrevOffset;
+    NodeSet->NodeScheme->ThisOffset = NodeSet->ThisOffset;
+}
+
+memNodeSetItem * queryNodeSet(memDB * DB, memNodeSetItem * NodeSet, memCondition * Condition) {
+    memNodeSetItem * result = NULL;
+    memNodeSetItem * prev = NULL;
+    if (NodeSet == NULL)
+        return NULL;
+    rewindFirstNodes(DB, NodeSet->NodeScheme);
+    while (NodeSet != NULL && openNode(DB, NodeSet->NodeScheme)) {
+        if (NodeSet->NodeScheme->ThisOffset == NodeSet->ThisOffset) {
+            NodeSet->PrevOffset = NodeSet->NodeScheme->PrevOffset;
+            if (testNodeCondition(DB, NodeSet->NodeScheme, Condition)) {
+                memNodeSetItem * item = (memNodeSetItem *) malloc(sizeof(memNodeSetItem));
+                occupied_memory += sizeof(memNodeSetItem);
+                item->NodeScheme = NodeSet->NodeScheme;
+                item->PrevOffset = NodeSet->NodeScheme->PrevOffset;
+                item->ThisOffset = NodeSet->NodeScheme->ThisOffset;
+                item->next = NULL;
+                item->prev = prev;
+                if (prev != NULL) prev->next = item;
+                prev = item;
+                if (result == NULL) result = item;
+            }
+            cancelNode(DB, NodeSet->NodeScheme);
+            NodeSet = NodeSet->next;
+        } else {
+            cancelNode(DB, NodeSet->NodeScheme);
+            nextNode(DB, NodeSet->NodeScheme);
+        }
+    }
+    return result;
+}
+
+void freeNodeSet(memDB * DB, memNodeSetItem * NodeSet) {
+    while (NodeSet != NULL) {
+        memNodeSetItem * to_delete = NodeSet;
+        NodeSet = NodeSet->next;
+        occupied_memory -= sizeof(*to_delete);
+        free(to_delete);
+    }
+}
+
+float * getDirectedToList(memDB * DB, memNodeSchemeRecord * NodeScheme, int * n) {
+    memAttrRecord * AList = NodeScheme->AttrsFirst;
+    float * buf;
+    float * result = NULL;
+    int offs = 0;
+    while (AList != NULL) {
+        offs += sizeof(float);
+        AList = AList->next;
+    }
+    // число присоединенных узлов
+    buf = (float *) (NodeScheme->Buffer + offs);
+    *n = *buf;
+    if (*n != 0) {
+        int i;
+        int nbytes = 2*(*n)*sizeof(float);
+        result = (float *) malloc(nbytes);
+        occupied_memory += nbytes;
+        for (i = 0; i < *n; i++) {
+            unsigned char Type;
+            // ѕровер€ем, не удален ли узел, на который ссылаемс€
+            db_fseek(DB, buf[2*i+2] + sizeof(int), SEEK_SET);
+            db_fread(&Type, sizeof(Type), 1, DB);
+            if (Type != recNodeData) {
+                result[2*i] = 0.0;
+                result[2*i+1] = 0.0;
+            } else {
+                result[2*i] = buf[2*i+1];
+                result[2*i+1] = buf[2*i+2];
+            }
+        }
+    }
+    return result;
+}
+
+// Внутренняя функция
+// Выбирает все узлы, соответствующие запросу в Cypher-стиле длиной nLinks элементов
+// Каждый элемент запроса включает ссылку на тип узла и наложенное на него условие
+memNodeSetItem * _queryCypherStyle(memDB * DB, int nLinks, va_list args) {
+    memNodeSetItem * set;
+    memNodeSchemeRecord * NodeScheme;
+    memCondition * Condition;
+    if (nLinks == 0)
+        return NULL;
+    NodeScheme = va_arg(args, memNodeSchemeRecord *);
+    Condition = va_arg(args, memCondition *);
+    set = queryAllNodesOfType(DB, NodeScheme, Condition);
+    nLinks--;
+    while (nLinks > 0) {
+        memNodeSchemeRecord * NodeSchemeNext;
+        memCondition * ConditionNext;
+        memNodeSetItem * setNext0 = NULL;
+        memNodeSetItem * setNext;
+        memNodeSetItem * set_ptr;
+        memNodeSetItem * prev = NULL;
+        if (set == NULL)
+            return NULL;
+        NodeSchemeNext = va_arg(args, memNodeSchemeRecord *);
+        ConditionNext = va_arg(args, memCondition *);
+        set_ptr = set;
+        while (set_ptr != NULL) {
+            NodeScheme->PrevOffset = set_ptr->PrevOffset;
+            NodeScheme->ThisOffset = set_ptr->ThisOffset;
+            if (openNode(DB, NodeScheme)) {
+                int i, n;
+                float * links = getDirectedToList(DB, NodeScheme, &n);
+                // Фильтруем set/DirectedTo(NodeSchemeNext) в setNext0(NodeSchemeNext)
+                for (i = 0; i < n; i++) {
+                    if (links[2*i] == NodeSchemeNext->RootOffset) {
+                        memNodeSetItem * item = (memNodeSetItem *) malloc(sizeof(memNodeSetItem));
+                        occupied_memory += sizeof(memNodeSetItem);
+                        item->NodeScheme = NodeSchemeNext;
+                        item->PrevOffset = 0;
+                        item->ThisOffset = links[2*i+1];
+                        item->next = NULL;
+                        item->prev = prev;
+                        if (prev != NULL) prev->next = item;
+                        prev = item;
+                        if (setNext0 == NULL) setNext0 = item;
+                    }
+                }
+                cancelNode(DB, NodeScheme);
+                occupied_memory -= 2*n*sizeof(float);
+                free(links);
+            }
+            set_ptr = set_ptr->next;
+        }
+        if (setNext0 == NULL)
+            setNext = NULL;
+        else
+            setNext = queryNodeSet(DB, setNext0, ConditionNext);
+        freeNodeSet(DB, set);
+        freeNodeSet(DB, setNext0);
+        set = setNext;
+        NodeScheme = NodeSchemeNext;
+        Condition = ConditionNext;
+        nLinks--;
+    }
+    return set;
+}
+
+// Выбирает все узлы, соответствующие запросу в Cypher-стиле длиной nLinks элементов
+// Каждый элемент запроса включает ссылку на тип узла и наложенное на него условие
+memNodeSetItem * queryCypherStyle(memDB * DB, int nLinks, ...) {
+    memNodeSetItem * result;
+    va_list args;
+    va_start(args, nLinks);
+    result = _queryCypherStyle(DB, nLinks, args);
+    va_end(args);
+    return result;
+}
+
+memCondition * createLogicCondition(unsigned char operation, memCondition * operand1, memCondition * operand2) {
+    memCondition * result = (memCondition *) malloc(sizeof(memCondition));
+    memConditionOperand * _operand1 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    memConditionOperand * _operand2 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    occupied_memory += sizeof(memCondition) + 2*sizeof(memConditionOperand);
+    _operand1->OperandType = oprndCondition;
+    _operand1->opCondition = operand1;
+    _operand2->OperandType = oprndCondition;
+    _operand2->opCondition = operand2;
+    result->OperationType = operation;
+    result->Operand1 = _operand1;
+    result->Operand2 = _operand2;
+    return result;
+}
+
+// ”слови€-отношени€ на атрибуты
+memCondition * createStringAttrCondition(unsigned char operation, char * AttrName, char * Val) {
+    memCondition * result = (memCondition *) malloc(sizeof(memCondition));
+    memConditionOperand * operand1 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    memConditionOperand * operand2 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    occupied_memory += sizeof(memCondition) + 2*sizeof(memConditionOperand);
+    operand1->OperandType = oprndAttrName;
+    operand1->opAttrName = (char *) malloc((strlen(AttrName)+1)*sizeof(char));
+    occupied_memory += 1 + strlen(AttrName);
+    strcpy(operand1->opAttrName, AttrName);
+    operand2->OperandType = oprndString;
+    operand2->opString =  (char *) malloc((strlen(Val)+1)*sizeof(char));
+    occupied_memory += 1 + strlen(Val);
+    strcpy(operand2->opString, Val);
+    result->OperationType = operation;
+    result->Operand1 = operand1;
+    result->Operand2 = operand2;
+    return result;
+}
+
+memCondition * createIntOrBoolAttrCondition(unsigned char operation, char * AttrName, int Val) {
+    return createFloatAttrCondition(operation, AttrName, (float) Val);
+}
+
+memCondition * createFloatAttrCondition(unsigned char operation, char * AttrName, float Val) {
+    memCondition * result = (memCondition *) malloc(sizeof(memCondition));
+    memConditionOperand * operand1 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    memConditionOperand * operand2 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
+    occupied_memory += sizeof(memCondition) + 2*sizeof(memConditionOperand);
+    operand1->OperandType = oprndAttrName;
+    operand1->opAttrName = (char *) malloc((strlen(AttrName)+1)*sizeof(char));
+    occupied_memory += 1 + strlen(AttrName);
+    strcpy(operand1->opAttrName, AttrName);
+    operand2->OperandType = oprndIntBoolFloat;
+    operand2->opInt_Bool_Float = Val;
+    result->OperationType = operation;
+    result->Operand1 = operand1;
+    result->Operand2 = operand2;
+    return result;
+}
