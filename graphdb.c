@@ -10,13 +10,17 @@
 
 // Значения по умолчанию. Реальные значения загружаются из конфигурационного файла в функции initGraphsRuntime()
 
-        int BufferSize = 1024*32; // Размеры всех буферов: узла, ввода и вывода. Это ограничение не влияет на
+int BufferSize = 1024*32; // Размеры всех буферов: узла, ввода и вывода. Это ограничение не влияет на
 // максимальный размер сохраняемых строк (до 2Гб)
 
-        int relink_table_delta = 20; // Приращение таблицы связей в случае, если свободное место кончислось
-        int reserved_for_links_in_node = 8; // Максимально допустимое количество связей на узел
-        int occupied_memory = 0;
+int relink_table_delta = 20; // Приращение таблицы связей в случае, если свободное место кончислось
+int reserved_for_links_in_node = 8; // Максимально допустимое количество связей на узел
+int occupied_memory = 0;
 
+// Возвращает количество выделенной памяти
+int getOccupiedMemory() {
+    return occupied_memory;
+}
 
 void register_free(int amount) {
     occupied_memory -= amount;
@@ -684,6 +688,49 @@ void rewindFirstNodes(memDB * DB, memNodeSchemeRecord * NodeScheme) {
     NodeScheme->PrevOffset = 0;
 }
 
+int deleteNode(memDB * DB, memNodeSchemeRecord * NodeScheme) {
+    unsigned char Type = recEmpty;
+    int AfterDeletedOffs;
+    cancelNode(DB, NodeScheme);
+    if (NodeScheme->FirstOffset == 0 || NodeScheme->LastOffset == 0 || NodeScheme->ThisOffset == 0)
+        return 0;
+    db_fseek(DB, NodeScheme->ThisOffset + sizeof(int), SEEK_SET);
+    db_fwrite(&Type, sizeof(Type), 1, DB);
+    db_fflush(DB);
+    db_fread(&AfterDeletedOffs, sizeof(AfterDeletedOffs), 1, DB);
+    if (NodeScheme->FirstOffset == NodeScheme->LastOffset) { // ”дал€ем единственный узел
+        int EmptyOffset = 0;
+        db_fseek(DB, NodeScheme->RootOffset, SEEK_SET);
+        db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+        NodeScheme->FirstOffset = 0;
+        db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+        NodeScheme->LastOffset = 0;
+        NodeScheme->PrevOffset = 0;
+        NodeScheme->ThisOffset = 0;
+    } else if (NodeScheme->FirstOffset == NodeScheme->ThisOffset) { // ”дал€ем первый узел
+        db_fseek(DB, NodeScheme->RootOffset, SEEK_SET);
+        db_fwrite(&AfterDeletedOffs, sizeof(AfterDeletedOffs), 1, DB);
+        NodeScheme->FirstOffset = AfterDeletedOffs;
+        NodeScheme->PrevOffset = 0;
+        NodeScheme->ThisOffset = AfterDeletedOffs;
+    } else if (NodeScheme->LastOffset == NodeScheme->ThisOffset) { // ”дал€ем последний узел
+        int EmptyOffset = 0;
+        db_fseek(DB, NodeScheme->PrevOffset + sizeof(int) + sizeof(unsigned char), SEEK_SET);
+        db_fwrite(&EmptyOffset, sizeof(EmptyOffset), 1, DB);
+        db_fseek(DB, NodeScheme->RootOffset + sizeof(int), SEEK_SET);
+        db_fwrite(&NodeScheme->PrevOffset, sizeof(int), 1, DB);
+        NodeScheme->LastOffset = NodeScheme->PrevOffset;
+        NodeScheme->PrevOffset = 0;
+        NodeScheme->ThisOffset = 0;
+    } else {
+        db_fseek(DB, NodeScheme->PrevOffset + sizeof(int) + sizeof(unsigned char), SEEK_SET);
+        db_fwrite(&AfterDeletedOffs, sizeof(AfterDeletedOffs), 1, DB);
+        NodeScheme->ThisOffset = AfterDeletedOffs;
+    }
+    db_fflush(DB);
+    return 1;
+}
+
 // Cоздает в базе новую строку и возвращает ее смещение от начала файла
 int createString(memDB * DB, char * S) {
     unsigned char Type = recString;
@@ -1094,6 +1141,46 @@ memNodeSetItem * queryCypherStyle(memDB * DB, int nLinks, ...) {
     return result;
 }
 
+void deleteCypherStyle(memDB * DB, int nLinks, ...) {
+    memNodeSetItem * set;
+    memNodeSetItem * set1;
+    va_list args;
+    va_start(args, nLinks);
+    set = _queryCypherStyle(DB, nLinks, args);
+    set1 = set;
+    va_end(args);
+    // ќбрабатываем set
+    while (set != NULL && set->next != NULL)
+        set = set->next;
+    // ”дал€ем узлы в обратном пор€дке, чтобы не мен€лс€ PrevOffset
+    while (set != NULL) {
+        navigateByNodeSetItem(DB, set);
+        deleteNode(DB, set->NodeScheme);
+        set = set->prev;
+    }
+    freeNodeSet(DB, set1);
+}
+
+void setCypherStyle(memDB * DB, char * AttrName, float AttrVal, int nLinks, ...) {
+    memNodeSetItem * set;
+    memNodeSetItem * set1;
+    va_list args;
+    va_start(args, nLinks);
+    set = _queryCypherStyle(DB, nLinks, args);
+    set1 = set;
+    va_end(args);
+    // ќбрабатываем set
+    while (set != NULL) {
+        navigateByNodeSetItem(DB, set);
+        if (openNode(DB, set->NodeScheme)) {
+            setNodeAttr(DB, set->NodeScheme, AttrName, AttrVal);
+            postNode(DB, set->NodeScheme);
+        }
+        set = set->next;
+    }
+    freeNodeSet(DB, set1);
+}
+
 memCondition * createLogicCondition(unsigned char operation, memCondition * operand1, memCondition * operand2) {
     memCondition * result = (memCondition *) malloc(sizeof(memCondition));
     memConditionOperand * _operand1 = (memConditionOperand *) malloc(sizeof(memConditionOperand));
@@ -1148,4 +1235,29 @@ memCondition * createFloatAttrCondition(unsigned char operation, char * AttrName
     result->Operand1 = operand1;
     result->Operand2 = operand2;
     return result;
+}
+
+void freeOperand(memConditionOperand * op) {
+    switch (op->OperandType) {
+        case oprndCondition:
+            freeCondition(op->opCondition);
+            break;
+        case oprndString:
+            occupied_memory -= 1 + strlen(op->opString);
+            free(op->opString);
+            break;
+        case oprndAttrName:
+            occupied_memory -= 1 + strlen(op->opAttrName);
+            free(op->opAttrName);
+            break;
+    }
+    occupied_memory -= sizeof(*op);
+    free(op);
+}
+
+void freeCondition(memCondition * Cond) {
+    freeOperand(Cond->Operand1);
+    freeOperand(Cond->Operand2);
+    occupied_memory -= sizeof(*Cond);
+    free(Cond);
 }

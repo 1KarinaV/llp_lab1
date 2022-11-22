@@ -85,6 +85,7 @@ typedef struct memCondition { // Элемент условия
     memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
 } memCondition;
 
+int getOccupiedMemory();  // Возвращает количество выделенной памяти
 void register_free(int amount);   // Считывает освобожденную в программе память
 void initGraphsRuntime(char * configFileName);
 
