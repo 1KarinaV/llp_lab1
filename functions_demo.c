@@ -120,7 +120,83 @@ int main () {
     freeNodeSet(DB, ns2);
     printf("%i actors selected!\n", i);
 
+    // Запрос построен по типу Cypher-запроса:
+    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;
+    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') SET a.Year_of_birthday=1975 RETURN a;\n");
+    setCypherStyle(DB, "Year_of_birthday", 1975, 2, MovieNodeType, cond, ActorNodeType, cond2);
 
+    // Запрос построен по типу Cypher-запроса:
+    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;
+    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
+    ns2 = queryCypherStyle(DB, 2, MovieNodeType, cond, ActorNodeType, cond2);
+    ns12 = ns2;
+    i = 0;
+    while (ns12 != NULL) {
+        navigateByNodeSetItem(DB, ns12);
+        if (openNode(DB, ActorNodeType)) {
+            char * Family = getString(DB, getNodeAttr(DB, ActorNodeType, "Family"));
+            printf("%s [%i]\n", Family, (int)getNodeAttr(DB, ActorNodeType, "Year_of_birthday"));
+            register_free(strlen(Family)+1);
+            free(Family);
+            cancelNode(DB, ActorNodeType);
+        } else
+            printf("Can't open actor node!\n");
+        ns12 = ns12->next;
+        i++;
+    }
+    freeNodeSet(DB, ns2);
+    printf("%i actors selected!\n", i);
+
+    // Запрос построен по типу Cypher-запроса:
+    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') DELETE a;
+    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') DELETE a;  =>\n");
+    deleteCypherStyle(DB, 2, MovieNodeType, cond, ActorNodeType, cond2);
+
+    // Запрос построен по типу Cypher-запроса:
+    // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;
+    printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
+    ns2 = queryCypherStyle(DB, 2, MovieNodeType, cond, ActorNodeType, cond2);
+    ns12 = ns2;
+    i = 0;
+    while (ns12 != NULL) {
+        navigateByNodeSetItem(DB, ns12);
+        if (openNode(DB, ActorNodeType)) {
+            char * Family = getString(DB, getNodeAttr(DB, ActorNodeType, "Family"));
+            printf("%s [%i]\n", Family, (int)getNodeAttr(DB, ActorNodeType, "Year_of_birthday"));
+            free(Family);
+            cancelNode(DB, ActorNodeType);
+        } else
+            printf("Can't open actor node!\n");
+        ns12 = ns12->next;
+        i++;
+    }
+    freeNodeSet(DB, ns2);
+    printf("%i actors selected!\n", i);
+
+    rewindFirstNodes(DB, ActorNodeType);
+    i = 0;
+    while (openNode(DB, ActorNodeType)) {
+        nextNode(DB, ActorNodeType);
+        i++;
+    }
+    printf("There is %i Actors\n", i);
+
+    rewindFirstNodes(DB, ActorNodeType);
+    i = 0;
+    while (openNode(DB, ActorNodeType)) {
+        deleteNode(DB, ActorNodeType);
+        i++;
+    }
+    printf("There is %i Actors deleted\n", i);
 
     closeDB(DB);
+    freeCondition(cond);
+    freeCondition(cond2);
+    // Проверяем, корректно ли освобождена память
+    if (getOccupiedMemory() == 0)
+        printf("Memory is freed correctly!\n");
+    else
+        printf("Not freed: %i bytes!\n", getOccupiedMemory());
+
+    return 0;
 }
