@@ -88,6 +88,8 @@ typedef struct memCondition { // Элемент условия
 int getOccupiedMemory();  // Возвращает количество выделенной памяти
 void register_free(int amount);   // Считывает освобожденную в программе память
 void initGraphsRuntime(char * configFileName);
+int getMaxLinksNum();    // Возвращает максимально возможное число связей узла
+long int getDBSize(memDB * DB);     // Возвращает физический размер файла базы данных
 
 memDBScheme * createDBScheme();          // Создает новую схему базы данных
 void freeDBSchemeAttr(memAttrRecord * Attr);         // Удаляет из памяти описатель атрибута

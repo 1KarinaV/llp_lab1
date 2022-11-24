@@ -26,6 +26,10 @@ void register_free(int amount) {
     occupied_memory -= amount;
 }
 
+int getMaxLinksNum() {
+    return reserved_for_links_in_node;
+}
+
 void initGraphsRuntime(char * configFileName) {
     FILE * F = fopen(configFileName, "rt");
     if (F) {
@@ -432,6 +436,10 @@ void db_fseek(memDB * DB, long int offset, int whence) {
     fseek(DB->FileDB, offset, whence);
 }
 
+long int getDBSize(memDB * DB) {
+    db_fseek(DB, 0, SEEK_END);
+    return db_ftell(DB);
+}
 
 // Сохраняет в файл список с типами разрешенных для соединения узлов
 void storeDirectedList(memDB * DB, memNodeDirectedTo * List) {
