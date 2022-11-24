@@ -62,7 +62,7 @@ void initGraphsRuntime(char * configFileName) {
     }
 }
 
-typedef struct { // Структура для перекодировки загруженных из файла Ѕƒ и уже невалидных указателей на реальные
+typedef struct { // Структура для перекодировки загруженных из файла БД и уже невалидных указателей на реальные
     memNodeSchemeRecord ** place; // Указатель на указатель, который должен получить новое значение
     memNodeSchemeRecord * old_value; // загруженное значение
     memNodeSchemeRecord * new_value; // новое значение
@@ -598,7 +598,6 @@ memDB * createNewDBbyScheme(memDBScheme * Scheme, char * FileName) {
     }
 }
 
-// Закрывает открытую базу данных
 void closeDB(memDB * DB) {
     freeDBScheme(DB->Scheme);
     db_fclose(DB);
@@ -1204,7 +1203,7 @@ memCondition * createLogicCondition(unsigned char operation, memCondition * oper
     return result;
 }
 
-// ”слови€-отношени€ на атрибуты
+// Условия-отношения на атрибуты
 memCondition * createStringAttrCondition(unsigned char operation, char * AttrName, char * Val) {
     memCondition * result = (memCondition *) malloc(sizeof(memCondition));
     memConditionOperand * operand1 = (memConditionOperand *) malloc(sizeof(memConditionOperand));

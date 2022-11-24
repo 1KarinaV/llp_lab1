@@ -111,22 +111,22 @@ void delNodeTypeFromScheme(memDBScheme * Scheme, memNodeSchemeRecord * NodeSchem
 memNodeDirectedTo * checkCanLinkTo(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme);
 
 // Добавляет к описателю узла NodeScheme ссылку на тип узла ToNodeScheme, в который может идти дуга.
-// Возвращает NULL при повторном добавлении или ссылку на добавл€емый тип
+// Возвращает NULL при повторном добавлении или ссылку на добавляемый тип
 memNodeDirectedTo * addDirectedToNodeScheme(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * ToNodeScheme);
 
 void delDirectedToFromNodeType(memNodeSchemeRecord * NodeScheme, memNodeSchemeRecord * Deleting);    // Удаляет возможность связей с узлами Deleting из определения типа узла NodeScheme
 
 
-// Поиск атрибута в описателе узла NodeScheme по имени Name, порzдковый номер атрибута попадает в *n,
+// Поиск атрибута в описателе узла NodeScheme по имени Name, порядковый номер атрибута попадает в *n,
 // Возвращает найденный описатель атрибута или NULL, если не найден
 memAttrRecord * findAttrByName(memNodeSchemeRecord * NodeScheme, char * Name, int * n);
 
-memAttrRecord * addAttrToNodeScheme(memNodeSchemeRecord * NodeScheme, char * Name, unsigned char Type);  // Добавляет к описателя узла атрибут с именем Name и типом Type
+memAttrRecord * addAttrToNodeScheme(memNodeSchemeRecord * NodeScheme, char * Name, unsigned char Type);  // Добавляет к описателю узла атрибут с именем Name и типом Type
 
 void delAttrFromNodeScheme(memNodeSchemeRecord * NodeScheme, memAttrRecord * Deleting);  // Удаляет атрибут Deleting из определения типа узла NodeScheme
 
 // Создает базу данных с описателем Scheme в файле с именем FileName
-// Возвращает указатель на структуру данных, представл€ющую созданную базу
+// Возвращает указатель на структуру данных, представляющую созданную базу
 memDB * createNewDBbyScheme(memDBScheme * Scheme, char * FileName);
 
 memDB * openDB(char * FileName);    // Открывает существующую базу с именем FileName
