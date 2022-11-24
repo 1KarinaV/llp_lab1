@@ -1,0 +1,21 @@
+all: functions_demo measurings
+
+functions_demo: functions_demo.obj graphdb.obj
+	cl functions_demo.obj graphdb.obj -o functions_demo.exe
+
+measurings: measurings.obj graphdb.obj
+	cl measurings.obj graphdb.obj -o measurings.exe
+
+functions_demo.obj: functions_demo.c
+	cl -c functions_demo.c
+
+measurings.obj: measurings.c
+	cl -c measurings.c
+
+graphdb.obj: graphdb.c
+	cl -c graphdb.c
+
+clean:
+	del *.obj \
+	del functions_demo.exe \
+	del measurings.exe
