@@ -13,17 +13,23 @@
     
  #### 3. Описание работы  
  Программа представляет собой следующие модули:
-+ functions_demo 
-+ graph_struct 
-+ meaurings 
++ graphdb  (содержит все операции: над элементами данных, над схемой, взаимодейтсвие с БД, и работа с файлом БД)
++ functions_demo (иллюстрируется все функции)
++ measurings (выполняются измерения)
  
  ##### Подключение к БД 
- 
- ##### Запрос создается с помощью стуктуры Query:
-
++ создание бд с помощью метода createNewDBbyScheme:
+ ```C
+ DB = createNewDBbyScheme(Scheme, "graphs.mydb");
+ ```
++ закрытие с помощью метода closeDB
+ ```C
+ closeDB(DB);
+ ```
+ ##### Реализация запроса:
+ Все запросы построены по типу Cypher-запроса
 + пример запроса:
 ```C
-    // Запрос построен по типу Cypher-запроса:
     // MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;
     printf("MATCH (j:Movie)-[:DIRECTED]->(a:Actor) WHERE (j.Year < 2004) AND (a.Family != 'Pitt') AND (a.Family != 'Hamatova') RETURN a;  =>\n");
     ns2 = queryCypherStyle(DB, 2, MovieNodeType, cond, ActorNodeType, cond2);
@@ -61,6 +67,7 @@ typedef struct memNodeSetItem {
    struct memNodeSetItem * prev; // Предыдущий элемент
 } memNodeSetItem;
 ```
+##### Используемые структуры:
 + Схема:
 ```C
 typedef struct { 
@@ -130,3 +137,6 @@ typedef struct memCondition {
 enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems; 
 ```
 #### 4. Аспекты реализации 
+#### 5. Результаты
+#### 4. Вывод
+
