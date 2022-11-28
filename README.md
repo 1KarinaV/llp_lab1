@@ -25,7 +25,22 @@
 + закрытие с помощью метода closeDB
  ```C
  closeDB(DB);
- ```
+ ``` 
+ ##### Создание и заполнение схемы таблицы:
+  ```C
+ Scheme = createDBScheme();
+
+ MovieNodeType = addNodeTypeToScheme(Scheme, "Movie");
+ addAttrToNodeScheme(MovieNodeType, "Title", tpString);
+ addAttrToNodeScheme(MovieNodeType, "Year", tpInt32);
+ ActorNodeType = addNodeTypeToScheme(Scheme, "Actor");
+ addAttrToNodeScheme(ActorNodeType, "Family", tpString);
+ addAttrToNodeScheme(ActorNodeType, "Name", tpString);
+ addAttrToNodeScheme(ActorNodeType, "Oscar", tpBoolean);
+ addAttrToNodeScheme(ActorNodeType, "Year_of_birthday", tpInt32);
+  
+ addDirectedToNodeScheme(MovieNodeType, ActorNodeType);
+```
  ##### Реализация запроса:
  Все запросы построены по типу Cypher-запроса
 + пример запроса:
@@ -137,8 +152,35 @@ typedef struct memCondition {
 enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems; 
 ```
 #### 4. Аспекты реализации 
+База данных хранится в файле, объемом до 10ГБ. 
+Бд построена на графах - узлах и дугах.    
+Объектом БД является Node. У узлов есть разные типы. Так, например, ноды типа movie связаны с нодами типа actor. В схему новый тип узла добавляется с помощью:
+```C
+memNodeSchemeRecord * addNodeTypeToScheme(memDBScheme * Scheme, char * TypeName);
+```
+А для того, чтобы показать связь между узлами используются дуги.  
+У каждого узла есть набор атрибутов (свойств), каждый из которых содержит в себе запись с именем, тип и указатель на следующий атрибут.    
+2. Для создания БД сначала нужно создать схему БД, которая содержит указатели на первый и последний типы узла. 
+После того, как была создана бд, функция возвращает указатель на структуру данных, представляющую созданную базу.    
+3. Далее в пустую строку добавялется новый узел, который по умолчанию заполняется нулями, и устанавливаются значения атрибутов, а затем в бд сохраняется либо новый нод, либо отредактированный.  
+```C
+createNode(DB, MovieNodeType);
+setNodeAttr(DB, MovieNodeType, "Title", createString(DB, Titles[i/2]));
+setNodeAttr(DB, MovieNodeType, "Year", 2000 + i);
+postNode(DB, MovieNodeType);
+```
+В случае, если не удастся провести дугу между двумя узлами, будет выведено соотвествующее сообщение:
+```C
+if (!LinkCurrentNodeToCurrentNode(DB, MovieNodeType, ActorNodeType))
+        printf("Can't connect!\n");
+        postNode(DB, MovieNodeType);
+```
+4. После этого внутренний указатель множества узлов перемещается на первый узел
+```C
+rewindFirstNodes(DB, MovieNodeType);
+```
 #### 5. Результаты
-##### Insertion
+##### Insertion 
 выполняется за O(1) независимо от размера данных, представленных в файле
 ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/insert.jpg)
 ##### Select
