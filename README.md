@@ -147,8 +147,21 @@ enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems;
    
 ##### Update and Delete   
 Операции обновления и удаления элемента данных выполняются не более чем за O(n*m) > t -> O(n+m), где n – количество представленных элементов данных обрабатываемого вида, m – количество фактически затронутых элементов данных
-  
-  ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/update.jpg)
+    
+  ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/update.jpg)  
   ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/delete.jpg)
+  
+#### Сборка
++ Linux  
+git clone https://github.com/1KarinaV/llp_lab1  
+cd llp_lab1  
+make all  
+./functions_demo  
+./measurings  
++ Windows  
+git clone https://github.com/1KarinaV/llp_lab1  
+cd llp_lab1  
+nmake -f Makefile.win  
+functions_demo.exe && measurings.exe  
 #### 6. Вывод
 
