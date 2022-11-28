@@ -138,5 +138,17 @@ enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems;
 ```
 #### 4. Аспекты реализации 
 #### 5. Результаты
-#### 4. Вывод
+##### Insertion
+выполняется за O(1) независимо от размера данных, представленных в файле
+![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/insert.jpg)
+##### Select
+Операция выборки без учёта отношений (но с опциональными условиями) выполняется за O(n), где n – количество строк
+![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/select.jpg)  
+   
+##### Update and Delete   
+Операции обновления и удаления элемента данных выполняются не более чем за O(n*m) > t -> O(n+m), где n – количество представленных элементов данных обрабатываемого вида, m – количество фактически затронутых элементов данных
+  
+  ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/update.jpg)
+  ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/delete.jpg)
+#### 6. Вывод
 
