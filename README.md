@@ -53,7 +53,7 @@ Churikova [1982]
 ```
 + Результатом запроса может быть:
 ```C
-typedef struct memNodeSetItem { // Структура-элемент результата запроса к базе данных
+typedef struct memNodeSetItem { 
    memNodeSchemeRecord * NodeScheme; // Ссылка на тип узла
    int PrevOffset; // Смещение предыдущего узла этого типа
    int ThisOffset; // Смещение текущего узла этого типа
@@ -61,3 +61,72 @@ typedef struct memNodeSetItem { // Структура-элемент резул�
    struct memNodeSetItem * prev; // Предыдущий элемент
 } memNodeSetItem;
 ```
++ Схема:
+```C
+typedef struct { 
+   memNodeSchemeRecord * FirstSchemeNode; // Указатель на описатель первого типа узла
+   memNodeSchemeRecord * LastSchemeNode; // Указатель на описатель последнего типа узла
+} memDBScheme;
+  
+typedef struct { 
+   memDBScheme * Scheme;
+   char * WriteBuffer; // Буфер записи
+   int nWriteBuffer;
+   char * ReadBuffer; // Буфер чтения
+   int nReadBuffer;
+   int iReadBuffer;
+   FILE * FileDB;
+} memDB; 
+```
++ Атрибут:
+```C
+typedef struct memAttrRecord { 
+   char * NameString; // Запись с именем атрибута
+   unsigned char Type; // Тип атрибута
+   struct memAttrRecord * next; // Указатель на следующий атрибут
+} memAttrRecord;
+```
++ Тип узла:
+```C
+typedef struct memNodeSchemeRecord { 
+   char * TypeString; // Запись с именем типа узла
+   int RootOffset; // Смещение от начала файла корневого указателя на список узлов
+   int FirstOffset; // Смещение от начала файла корневого указателя на первый элемент списка узлов
+   int LastOffset; // Смещение от начала файла корневого указателя на последний элемент списка узлов
+   char * Buffer; // Буфер с данными текущего узла
+   int nBuffer; // Число заполненных байт в буфере
+   int added; // Флаг того, что создается новый узел
+   int PrevOffset; // Смещение от начала файла предыдущего узла
+   int ThisOffset; // Смещение от начала файла текущего узла
+   memNodeDirectedTo * DirectedToFirst; // Указатель на начало списка с типами узлов
+   memNodeDirectedTo * DirectedToLast; // Указатель на конец списка с типами узлов
+   struct memAttrRecord * AttrsFirst; // Указатель на начало списка атрибутов
+   struct memAttrRecord * AttrsLast; // Указатель на конец списка атрибутов
+   struct memNodeSchemeRecord * NextNodeScheme; // Указатель на следующий тип узла
+} memNodeSchemeRecord;
+```
++ Операнд
+```C
+typedef struct { 
+   unsigned char OperandType; // тип операнда
+   union {
+       struct memCondition * opCondition; // Другое условие
+       char * opString; // Строка
+       float opInt_Bool_Float; // Целое число или логическое значение или вещественное число
+       char * opAttrName;
+   };
+} memConditionOperand;
+```
++ Элемент условия:
+```C
+typedef struct memCondition { 
+   unsigned char OperationType; // Операция
+   memConditionOperand * Operand1; // Первый операнд
+   memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
+} memCondition;
+```
++ Возможные типы данных:
+```C
+enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems; 
+```
+#### 4. Аспекты реализации 
