@@ -149,7 +149,7 @@ enum { tpInt32 = 0, tpFloat, tpString, tpBoolean } tpDataItems;
 Операции обновления и удаления элемента данных выполняются не более чем за O(n*m) > t -> O(n+m), где n – количество представленных элементов данных обрабатываемого вида, m – количество фактически затронутых элементов данных
     
   ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/update.jpg)  
-  ![Alt-текст](https://github.com/1KarinaV/llp_lab1/blob/master/img/delete.jpg)
+  ![IMG_4515](https://user-images.githubusercontent.com/84856275/204339541-e51fdeec-9218-4a1e-8f31-fb4a0acee160.jpeg)
   
 #### Сборка
 + Linux  
