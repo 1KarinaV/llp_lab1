@@ -180,7 +180,6 @@ if (!LinkCurrentNodeToCurrentNode(DB, MovieNodeType, ActorNodeType))
 ```C
 rewindFirstNodes(DB, MovieNodeType);
 ```
-5. 
 #### 5. Результаты
 ##### Insertion 
 выполняется за O(1) независимо от размера данных, представленных в файле
@@ -197,15 +196,22 @@ rewindFirstNodes(DB, MovieNodeType);
   
 #### Сборка
 + Linux  
+```
 git clone https://github.com/1KarinaV/llp_lab1  
 cd llp_lab1  
 make all  
 ./functions_demo  
 ./measurings  
+```
 + Windows  
+```
 git clone https://github.com/1KarinaV/llp_lab1  
 cd llp_lab1  
-nmake -f Makefile.win  
-functions_demo.exe && measurings.exe  
+```
+Необходимо оставить файл Makefile.win и удалить расширение
+```
+make all 
+functions_demo.exe && measurings.exe 
+```
 #### 6. Вывод
 В ходе работы была реализована графовая база данных ,поддерживающая операции Create, Insert, Delete, Update между вершинами и ребрами. Так же были разработаны тесты, в результате выполнения которых, было продемонстрировано, что реализация операция была выполнена с помощью правильных алгоритмов, потому что по графикам видно, что алгоритмическая сложность совпала с ожидаемой. 
