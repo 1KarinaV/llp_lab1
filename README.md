@@ -76,8 +76,8 @@ Churikova [1982]
 ```C
 typedef struct memNodeSetItem { 
    memNodeSchemeRecord * NodeScheme; // Ссылка на тип узла
-   int PrevOffset; // Смещение предыдущего узла этого типа
-   int ThisOffset; // Смещение текущего узла этого типа
+   int PrevOffset; 
+   int ThisOffset; 
    struct memNodeSetItem * next; // Следующий элемент
    struct memNodeSetItem * prev; // Предыдущий элемент
 } memNodeSetItem;
@@ -86,8 +86,8 @@ typedef struct memNodeSetItem {
 + Схема:
 ```C
 typedef struct { 
-   memNodeSchemeRecord * FirstSchemeNode; // Указатель на описатель первого типа узла
-   memNodeSchemeRecord * LastSchemeNode; // Указатель на описатель последнего типа узла
+   memNodeSchemeRecord * FirstSchemeNode; 
+   memNodeSchemeRecord * LastSchemeNode; 
 } memDBScheme;
   
 typedef struct { 
@@ -104,37 +104,37 @@ typedef struct {
 ```C
 typedef struct memAttrRecord { 
    char * NameString; // Запись с именем атрибута
-   unsigned char Type; // Тип атрибута
+   unsigned char Type; 
    struct memAttrRecord * next; // Указатель на следующий атрибут
 } memAttrRecord;
 ```
 + Тип узла:
 ```C
 typedef struct memNodeSchemeRecord { 
-   char * TypeString; // Запись с именем типа узла
-   int RootOffset; // Смещение от начала файла корневого указателя на список узлов
-   int FirstOffset; // Смещение от начала файла корневого указателя на первый элемент списка узлов
-   int LastOffset; // Смещение от начала файла корневого указателя на последний элемент списка узлов
-   char * Buffer; // Буфер с данными текущего узла
-   int nBuffer; // Число заполненных байт в буфере
-   int added; // Флаг того, что создается новый узел
-   int PrevOffset; // Смещение от начала файла предыдущего узла
-   int ThisOffset; // Смещение от начала файла текущего узла
-   memNodeDirectedTo * DirectedToFirst; // Указатель на начало списка с типами узлов
-   memNodeDirectedTo * DirectedToLast; // Указатель на конец списка с типами узлов
-   struct memAttrRecord * AttrsFirst; // Указатель на начало списка атрибутов
-   struct memAttrRecord * AttrsLast; // Указатель на конец списка атрибутов
-   struct memNodeSchemeRecord * NextNodeScheme; // Указатель на следующий тип узла
+   char * TypeString; 
+   int RootOffset; 
+   int FirstOffset; 
+   int LastOffset; 
+   char * Buffer; 
+   int nBuffer; 
+   int added; 
+   int PrevOffset; 
+   int ThisOffset; 
+   memNodeDirectedTo * DirectedToFirst; 
+   memNodeDirectedTo * DirectedToLast; 
+   struct memAttrRecord * AttrsFirst; 
+   struct memAttrRecord * AttrsLast; 
+   struct memNodeSchemeRecord * NextNodeScheme; 
 } memNodeSchemeRecord;
 ```
 + Операнд
 ```C
 typedef struct { 
-   unsigned char OperandType; // тип операнда
+   unsigned char OperandType; 
    union {
        struct memCondition * opCondition; // Другое условие
-       char * opString; // Строка
-       float opInt_Bool_Float; // Целое число или логическое значение или вещественное число
+       char * opString; 
+       float opInt_Bool_Float; 
        char * opAttrName;
    };
 } memConditionOperand;
@@ -143,8 +143,8 @@ typedef struct {
 ```C
 typedef struct memCondition { 
    unsigned char OperationType; // Операция
-   memConditionOperand * Operand1; // Первый операнд
-   memConditionOperand * Operand2; // Второй операнд (или NULL, если операция унарная)
+   memConditionOperand * Operand1; 
+   memConditionOperand * Operand2; 
 } memCondition;
 ```
 + Возможные типы данных:
